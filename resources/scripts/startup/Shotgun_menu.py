@@ -10,10 +10,17 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+# ---- DEBUG ----
+import logging
+import os
+log_file = os.path.join(os.path.dirname(__file__), 'debug_shotgun_menu.log')
+logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+logging.debug('tk-blender Shotgun_menu.py script started')
+# ---- DEBUG ----
 
 import os
 import sys
-import imp
+from importlib.machinery import SourceFileLoader
 import time
 import ast
 import inspect
@@ -40,7 +47,7 @@ bl_info = {
     "license": "GPL",
     "deps": "",
     "version": (1, 0, 0),
-    "blender": (2, 82, 0),
+    "blender": (4, 5, 0),
     "location": "Shotgun",
     "warning": "",
     "wiki_url": "https://github.com/diegogarciahuerta/tk-blender/releases",
@@ -111,11 +118,6 @@ class QtWindowEventLoop(bpy.types.Operator):
     bl_idname = "screen.qt_event_loop"
     bl_label = "Qt Event Loop"
 
-    def __init__(self):
-        self._app = None
-        self._timer = None
-        self._event_loop = None
-
     def processEvents(self):
         self._event_loop.processEvents()
         self._app.sendPostedEvents(None, 0)
@@ -158,7 +160,7 @@ class TOPBAR_MT_shotgun(Menu):
     Creates the Shotgun top level menu
     """
 
-    bl_label = "FPTR"
+    bl_label = "Shotgun"
     bl_idname = "TOPBAR_MT_shotgun"
 
     def draw(self, context):
@@ -266,7 +268,7 @@ def boostrap():
         sys.path.insert(0, SGTK_MODULE_PATH)
 
     engine_startup_path = os.environ.get("SGTK_BLENDER_ENGINE_STARTUP")
-    engine_startup = imp.load_source("sgtk_blender_engine_startup", engine_startup_path)
+    engine_startup = SourceFileLoader("sgtk_blender_engine_startup", engine_startup_path).load_module()
     
     if PYSIDE6_IMPORTED and sys.platform == "win32":
         # avoid loading QtWebEngine on Windows!
@@ -295,16 +297,16 @@ def boostrap():
                     logger.debug("'%s' was skipped: %s", module_name, e)
                     pass
 
-            return (
-                PySide6.__name__,
-                PySide6.__version__,
-                PySide6,
-                modules_dict,
-                self._to_version_tuple(PySide6.__version__),
-            )
-        
-        from tank.util.qt_importer import QtImporter
-        QtImporter._import_pyside6 = _import_pyside6
+                return (
+                    PySide6.__name__,
+                    PySide6.__version__,
+                    PySide6,
+                    modules_dict,
+                    self._to_version_tuple(PySide6.__version__),
+                )
+            
+            from tank.util.qt_importer import QtImporter
+            QtImporter._import_pyside6 = _import_pyside6
 
     # Fire up Toolkit and the environment engine.
     engine_startup.start_toolkit()
@@ -322,22 +324,26 @@ def error_importing_pyside2(*args):
 
 
 def register():
-    bpy.utils.register_class(ShotgunConsoleLog)
+    try:
+        bpy.utils.register_class(ShotgunConsoleLog)
 
-    if not PYSIDE2_IMPORTED:
-        # bpy.app.timers.register(error_importing_pyside2, first_interval=5)
-        load_factory_startup_post.append(error_importing_pyside2)
-        return
+        if not PYSIDE2_IMPORTED:
+            # bpy.app.timers.register(error_importing_pyside2, first_interval=5)
+            load_factory_startup_post.append(error_importing_pyside2)
+            return
 
-    bpy.utils.register_class(QtWindowEventLoop)
-    TOPBAR_MT_help = bpy.types.TOPBAR_MT_help
-    TOPBAR_MT_editor_menus = insert_main_menu(
-        TOPBAR_MT_shotgun, before_menu_class=TOPBAR_MT_help
-    )
-    bpy.utils.register_class(TOPBAR_MT_editor_menus)
-    bpy.utils.register_class(TOPBAR_MT_shotgun)
+        bpy.utils.register_class(QtWindowEventLoop)
+        TOPBAR_MT_help = bpy.types.TOPBAR_MT_help
+        TOPBAR_MT_editor_menus = insert_main_menu(
+            TOPBAR_MT_shotgun, before_menu_class=TOPBAR_MT_help
+        )
+        bpy.utils.register_class(TOPBAR_MT_editor_menus)
+        bpy.utils.register_class(TOPBAR_MT_shotgun)
 
-    load_factory_startup_post.append(startup)
+        load_factory_startup_post.append(startup)
+    except Exception as e:
+        logging.exception('Error in register: %s' % e)
+        raise
 
 
 def unregister():

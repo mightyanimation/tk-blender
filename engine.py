@@ -10,6 +10,13 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+# ---- DEBUG ----
+import logging
+import os
+log_file = os.path.join(os.path.dirname(__file__), 'debug_startup.log')
+logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+logging.debug('tk-blender engine.py script started')
+# ---- DEBUG ----
 
 """
 A Blender engine for Tank.
@@ -318,115 +325,122 @@ class BlenderEngine(Engine):
         """
         Initializes the Blender engine.
         """
+        try:
+            self.logger.debug("Initializing engine... %s", self)
 
-        self.logger.debug("Initializing engine... %s", self)
+            self.tk_blender = self.import_module("tk_blender")
 
-        self.tk_blender = self.import_module("tk_blender")
+            self.init_qt_app()
 
-        self.init_qt_app()
+            """
+            Runs after the engine is set up but before any apps have been
+            initialized.
+            """
+            from tank.platform.qt import QtCore
 
-        """
-        Runs after the engine is set up but before any apps have been
-        initialized.
-        """
-        from tank.platform.qt import QtCore
-
-        # unicode characters returned by the shotgun api need to be converted
-        # to display correctly in all of the app windows
-        # tell QT to interpret C strings as utf-8
-        utf8 = QtCore.QTextCodec.codecForName("utf-8")
-        QtCore.QTextCodec.setCodecForCStrings(utf8)
-        self.logger.debug("set utf-8 codec for widget text")
-        # MutableMapping has been moved in py310. tk-multi-publish2 uses it
-        # it's faster (and dirtier) to just monkey patch here
-        from collections.abc import MutableMapping
-        collections.MutableMapping = MutableMapping
+            # unicode characters returned by the shotgun api need to be converted
+            # to display correctly in all of the app windows
+            # tell QT to interpret C strings as utf-8
+            utf8 = QtCore.QTextCodec.codecForName("utf-8")
+            QtCore.QTextCodec.setCodecForCStrings(utf8)
+            self.logger.debug("set utf-8 codec for widget text")
+            # MutableMapping has been moved in py310. tk-multi-publish2 uses it
+            # it's faster (and dirtier) to just monkey patch here
+            from collections.abc import MutableMapping
+            collections.MutableMapping = MutableMapping
+        except Exception as e:
+            logging.exception('Error in pre_app_init: %s' % e)
+            raise
 
     def init_engine(self):
         """
         Initializes the Blender engine.
         """
-        self.logger.debug("%s: Initializing...", self)
+        try:
+            self.logger.debug("%s: Initializing...", self)
 
-        # check that we are running a supported OS
-        if not any([is_windows(), is_linux(), is_macos()]):
-            raise tank.TankError(
-                "The current platform is not supported!"
-                " Supported platforms "
-                "are Mac, Linux 64 and Windows 64."
-            )
-
-        # check that we are running an ok version of Blender
-        build_version = bpy.app.version
-        app_ver = float(".".join(map(str, build_version[:2])))
-
-        if app_ver < MIN_COMPATIBILITY_VERSION:
-            msg = (
-                "Shotgun integration is not compatible with %s versions older than %s"
-                % (
-                    APPLICATION_NAME,
-                    MIN_COMPATIBILITY_VERSION,
+            # check that we are running a supported OS
+            if not any([is_windows(), is_linux(), is_macos()]):
+                raise tank.TankError(
+                    "The current platform is not supported!"
+                    " Supported platforms "
+                    "are Mac, Linux 64 and Windows 64."
                 )
-            )
-            self.show_error(msg)
-            raise tank.TankError(msg)
 
-        if app_ver > MIN_COMPATIBILITY_VERSION:
-            # show a warning that this version of Blender isn't yet fully tested
-            # with Shotgun:
-            msg = (
-                "The Shotgun Pipeline Toolkit has not yet been fully "
-                "tested with %s %s.  "
-                "You can continue to use Toolkit but you may experience "
-                "bugs or instability."
-                "\n\n" % (APPLICATION_NAME, app_ver)
-            )
+            # check that we are running an ok version of Blender
+            build_version = bpy.app.version
+            app_ver = float(".".join(map(str, build_version[:2])))
 
-            # determine if we should show the compatibility warning dialog:
-            show_warning_dlg = self.has_ui and SHOW_COMP_DLG not in os.environ
-
-            if show_warning_dlg:
-                # make sure we only show it once per session
-                os.environ[SHOW_COMP_DLG] = "1"
-
-                min_ver = self.get_setting("compatibility_dialog_min_version")
-                if build_version[0] < min_ver:
-                    show_warning_dlg = False
-
-            if show_warning_dlg:
-                # Note, title is padded to try to ensure dialog isn't insanely
-                # narrow!
-                self.show_info(msg)
-
-            # always log the warning to the script editor:
-            self.logger.warning(msg)
-
-            # In the case of Windows, we have the possibility of locking up if
-            # we allow the PySide shim to import QtWebEngineWidgets.
-            # We can stop that happening here by setting the following
-            # environment variable.
-
-            # Note that prior PyQt5 v5.12 this module existed, after that it has
-            # been separated and would not cause any issues.
-            # https://www.riverbankcomputing.com/software/pyqtwebengine/intro
-            if is_windows():
-                self.logger.debug(
-                    "This application on Windows can deadlock if QtWebEngineWidgets "
-                    "is imported. Setting "
-                    "SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT=1..."
+            if app_ver < MIN_COMPATIBILITY_VERSION:
+                msg = (
+                    "Shotgun integration is not compatible with %s versions older than %s"
+                    % (
+                        APPLICATION_NAME,
+                        MIN_COMPATIBILITY_VERSION,
+                    )
                 )
-                os.environ["SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT"] = "1"
+                self.show_error(msg)
+                raise tank.TankError(msg)
 
-        # default menu name is Shotgun but this can be overriden
-        # in the configuration to be Sgtk in case of conflicts
-        self._menu_name = "Shotgun"
-        if self.get_setting("use_sgtk_as_menu_name", False):
-            self._menu_name = "Sgtk"
+            if app_ver > MIN_COMPATIBILITY_VERSION:
+                # show a warning that this version of Blender isn't yet fully tested
+                # with Shotgun:
+                msg = (
+                    "The Shotgun Pipeline Toolkit has not yet been fully "
+                    "tested with %s %s.  "
+                    "You can continue to use Toolkit but you may experience "
+                    "bugs or instability."
+                    "\n\n" % (APPLICATION_NAME, app_ver)
+                )
 
-        if self.get_setting("automatic_context_switch", True):
-            # need to watch some scene events in case the engine needs rebuilding:
-            setup_app_handlers()
-            self.logger.debug("Registered open and save callbacks.")
+                # determine if we should show the compatibility warning dialog:
+                show_warning_dlg = self.has_ui and SHOW_COMP_DLG not in os.environ
+
+                if show_warning_dlg:
+                    # make sure we only show it once per session
+                    os.environ[SHOW_COMP_DLG] = "1"
+
+                    min_ver = self.get_setting("compatibility_dialog_min_version")
+                    if build_version[0] < min_ver:
+                        show_warning_dlg = False
+
+                if show_warning_dlg:
+                    # Note, title is padded to try to ensure dialog isn't insanely
+                    # narrow!
+                    self.show_info(msg)
+
+                # always log the warning to the script editor:
+                self.logger.warning(msg)
+
+                # In the case of Windows, we have the possibility of locking up if
+                # we allow the PySide shim to import QtWebEngineWidgets.
+                # We can stop that happening here by setting the following
+                # environment variable.
+
+                # Note that prior PyQt5 v5.12 this module existed, after that it has
+                # been separated and would not cause any issues.
+                # https://www.riverbankcomputing.com/software/pyqtwebengine/intro
+                if is_windows():
+                    self.logger.debug(
+                        "This application on Windows can deadlock if QtWebEngineWidgets "
+                        "is imported. Setting "
+                        "SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT=1..."
+                    )
+                    os.environ["SHOTGUN_SKIP_QTWEBENGINEWIDGETS_IMPORT"] = "1"
+
+            # default menu name is Shotgun but this can be overriden
+            # in the configuration to be Sgtk in case of conflicts
+            self._menu_name = "Shotgun"
+            if self.get_setting("use_sgtk_as_menu_name", False):
+                self._menu_name = "Sgtk"
+
+            if self.get_setting("automatic_context_switch", True):
+                # need to watch some scene events in case the engine needs rebuilding:
+                setup_app_handlers()
+                self.logger.debug("Registered open and save callbacks.")
+        except Exception as e:
+            logging.exception('Error in init_engine: %s' % e)
+            raise
 
     def create_shotgun_menu(self, disabled=False):
         """

@@ -10,6 +10,13 @@
 # The full license is in the file LICENSE, distributed with this software.
 # ----------------------------------------------------------------------------
 
+# ---- DEBUG ----
+import logging
+import os
+log_file = os.path.join(os.path.dirname(__file__), 'debug_launcher.log')
+logging.basicConfig(level=logging.DEBUG, filename=log_file, filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
+logging.debug('tk-blender startup.py script started')
+# ---- DEBUG ----
 
 import os
 import sys
@@ -77,47 +84,56 @@ class BlenderLauncher(SoftwareLauncher):
                                  launch.
         :returns: :class:`LaunchInformation` instance
         """
-        required_env = {}
+        try:
+            required_env = {}
 
-        # Run the engine's startup file file when Blender starts up
-        # by appending it to the env PYTHONPATH.
-        scripts_path = os.path.join(self.disk_location, "resources", "scripts")
+            # Run the engine's startup file file when Blender starts up
+            # by appending it to the env PYTHONPATH.
+            scripts_path = os.path.join(self.disk_location, "resources", "scripts")
 
-        startup_path = os.path.join(scripts_path, "startup", "Shotgun_menu.py")
+            startup_path = os.path.join(scripts_path, "startup", "Shotgun_menu.py")
 
-        args += " -P " + startup_path
+            args += " -P " + startup_path
 
-        required_env["BLENDER_USER_SCRIPTS"] = scripts_path
+            required_env["BLENDER_USER_SCRIPTS"] = scripts_path
 
-        if not os.environ.get("PYSIDE2_PYTHONPATH"):
-            pyside2_python_path = os.path.join(self.disk_location, "python", "ext")
-            required_env["PYSIDE2_PYTHONPATH"] = pyside2_python_path
+            # required_env["PYSIDE2_PYTHONPATH"] = pyside2_python_path
 
-        # Prepare the launch environment with variables required by the
-        # classic bootstrap approach.
-        self.logger.debug(
-            "Preparing Blender Launch via Toolkit Classic methodology ..."
-        )
+            # Prepare the launch environment with variables required by the
+            # classic bootstrap approach.
+            self.logger.debug(
+                "Preparing Blender Launch via Toolkit Classic methodology ..."
+            )
 
-        required_env["SGTK_MODULE_PATH"] = sgtk.get_sgtk_module_path().replace(
-            "\\", "/"
-        )
+            required_env["SGTK_MODULE_PATH"] = sgtk.get_sgtk_module_path().replace(
+                "\\", "/"
+            )
 
-        engine_startup_path = os.path.join(
-            self.disk_location, "startup", "bootstrap.py"
-        )
+            engine_startup_path = os.path.join(
+                self.disk_location, "startup", "bootstrap.py"
+            )
 
-        required_env["SGTK_BLENDER_ENGINE_STARTUP"] = engine_startup_path
-        required_env["SGTK_BLENDER_ENGINE_PYTHON"] = sys.executable.replace("\\", "/")
+            required_env["SGTK_BLENDER_ENGINE_STARTUP"] = engine_startup_path
+            # required_env["SGTK_BLENDER_ENGINE_PYTHON"] = sys.executable.replace("\\", "/")
 
-        required_env["SGTK_ENGINE"] = self.engine_name
-        required_env["SGTK_CONTEXT"] = sgtk.context.serialize(self.context)
+            required_env["SGTK_ENGINE"] = self.engine_name
+            required_env["SGTK_CONTEXT"] = sgtk.context.serialize(self.context)
 
-        if file_to_open:
-            # Add the file name to open to the launch environment
-            required_env["SGTK_FILE_TO_OPEN"] = file_to_open
+            if file_to_open:
+                # Add the file name to open to the launch environment
+                required_env["SGTK_FILE_TO_OPEN"] = file_to_open
 
-        return LaunchInformation(exec_path, args, required_env)
+            logging.debug('--- Launch Information ---')
+            logging.debug('Executable Path: %s' % exec_path)
+            logging.debug('Arguments: %s' % args)
+            for key, value in required_env.items():
+                logging.debug('Env: %s = %s' % (key, value))
+            logging.debug('--------------------------')
+
+            return LaunchInformation(exec_path, args, required_env)
+        except Exception as e:
+            logging.exception('Error in prepare_launch: %s' % e)
+            raise
 
     ###########################################################################
     # private methods
