@@ -37,3 +37,4 @@ pip-log.txt
 .stfolder
 __pycache__
 python/ext/*
+*.log
