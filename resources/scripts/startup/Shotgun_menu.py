@@ -33,7 +33,7 @@ import site
 
 DIR_PATH = os.path.dirname(os.path.abspath(__file__))
 
-ext_libs = os.environ.get("PYSIDE2_PYTHONPATH")
+ext_libs = os.environ.get("PYSIDE6_PYTHONPATH")
 
 if ext_libs and os.path.exists(ext_libs):
     if ext_libs not in sys.path:
@@ -82,9 +82,9 @@ except ModuleNotFoundError:
                 QWebEngineProfile = None
             PySide6.QtWebEngineCore = QtWebEngineCore
             PySide6.QtWebEngineWidgets = None
-        
+
         from PySide6 import QtWidgets, QtCore
-        
+
         PYSIDE2_IMPORTED = True
         PYSIDE6_IMPORTED = True
     except ModuleNotFoundError:
@@ -269,7 +269,7 @@ def boostrap():
 
     engine_startup_path = os.environ.get("SGTK_BLENDER_ENGINE_STARTUP")
     engine_startup = SourceFileLoader("sgtk_blender_engine_startup", engine_startup_path).load_module()
-    
+
     if PYSIDE6_IMPORTED and sys.platform == "win32":
         # avoid loading QtWebEngine on Windows!
         def _import_pyside6(self):
@@ -304,7 +304,7 @@ def boostrap():
                     modules_dict,
                     self._to_version_tuple(PySide6.__version__),
                 )
-            
+
             from tank.util.qt_importer import QtImporter
             QtImporter._import_pyside6 = _import_pyside6
 
