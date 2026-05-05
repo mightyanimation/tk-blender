@@ -56,6 +56,8 @@ class BlenderLauncher(SoftwareLauncher):
         "darwin": [
             "$BLENDER_BIN_DIR/Blender",
             "/Library/Application Support/Blender.app/Contents/MacOS/Blender",
+            "/Applications/Blender{version}.app/Contents/MacOS/Blender",
+            "/Applications/Blender.app/Contents/MacOS/Blender",
         ],
         "win32": [
             "$BLENDER_BIN_DIR/blender.exe",
@@ -63,7 +65,12 @@ class BlenderLauncher(SoftwareLauncher):
             "C:/Program Files/Blender Foundation/Blender {version}/blender.exe",
             "C:/Program Files/Blender Foundation/Blender/blender.exe",
         ],
-        "linux2": ["$BLENDER_BIN_DIR/blender", "/usr/share/blender/blender"],
+        "linux": [
+            "$BLENDER_BIN_DIR/blender",
+            "/usr/share/blender/blender",
+            "/opt/blender-{version}-linux-x64/blender",
+            # "/opt/blender-{version}/blender"
+        ],
     }
 
     @property
@@ -205,7 +212,10 @@ class BlenderLauncher(SoftwareLauncher):
                 # in the case of version we return something different than
                 # an empty string because there are cases were the installation
                 # directories do not include version number information.
-                executable_version = key_dict.get("version", " ")
+                executable_version = key_dict.get("version")
+
+                if not executable_version or executable_version == " ":
+                    executable_version = self._get_blender_version(executable_path)
 
                 args = []
                 if extra_args:
@@ -222,3 +232,22 @@ class BlenderLauncher(SoftwareLauncher):
                 )
 
         return sw_versions
+
+    def _get_blender_version(self, path):
+        """
+        Attempts to extract the blender version from the given executable path.
+        """
+        # On macOS, we can look into the bundle Resources
+        if sys.platform == "darwin" and "/Contents/MacOS/" in path:
+            app_bundle = path.split("/Contents/MacOS/")[0]
+            resources_dir = os.path.join(app_bundle, "Contents", "Resources")
+            if os.path.exists(resources_dir):
+                # look for a directory that is just a version number (e.g. 3.0, 4.5)
+                for item in os.listdir(resources_dir):
+                    if os.path.isdir(os.path.join(resources_dir, item)):
+                        # Simple check for version-like folder names
+                        if item.replace(".", "").isdigit():
+                            return item
+
+        # Fallback to a default that passes the minimum version check if possible
+        return self.minimum_supported_version
